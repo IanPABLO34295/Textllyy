@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TEXTLY • Web App</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+
+  <!-- Emoji Picker -->
+  <script src="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.min.js"></script>
+
+  <style>
+    :root{
+      --bg-1:#5563DE; --bg-2:#8752D9;
+      --panel:rgba(255,255,255,.12);
+      --panel-2:rgba(255,255,255,.18);
+      --text:#111; --weak:#666;
+      --brand:#007aff; --brand-2:#005bb5;
+      --bubble-s:#dcf8c6; --bubble-s-b:#b2e89a; --bubble-r:#fff; --bubble-r-b:#e5e5e5;
+      --shadow:0 8px 32px rgba(0,0,0,.25);
+      --radius:18px;
+      --font: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:linear-gradient(120deg,var(--bg-1),var(--bg-2));
+      font-family:var(--font);
+      color:#111;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+
+    /* App shell */
+    .app{ height:100%; display:flex; flex-direction:column; max-width:860px; margin:0 auto; position:relative; }
+    .app-header{
+      padding:10px 16px; display:flex; align-items:center; gap:10px;
+      backdrop-filter: blur(12px);
+      background: linear-gradient(0deg, rgba(255,255,255,.10), rgba(255,255,255,.25));
+      color:#fff;
+    }
+    .app-header .title{font-weight:800; font-size:18px; letter-spacing:.2px}
+    .spacer{flex:1}
+    .icon-btn{
+      border:none; background:rgba(255,255,255,.2); color:#fff;
+      padding:8px 10px; border-radius:12px; font-size:16px; cursor:pointer;
+    }
+    .link{ color:#fff; text-decoration:underline; cursor:pointer; }
+
+    /* Auth card */
+    .auth-wrap{ flex:1; display:grid; place-items:center; padding:16px; }
+    .card{
+      width:min(520px, 92vw);
+      background:var(--panel);
+      border:1px solid rgba(255,255,255,.25);
+      border-radius:20px; backdrop-filter:blur(12px);
+      box-shadow:var(--shadow);
+      color:#fff;
+      padding:18px;
+    }
+    .tabs{ display:flex; gap:8px; margin-bottom:10px; }
+    .tabs button{ flex:1; padding:10px; border:none; border-radius:12px; background:rgba(255,255,255,.18); color:#fff; cursor:pointer; }
+    .tabs button.active{ background:var(--brand); }
+    .form{ display:flex; flex-direction:column; gap:12px; margin-top:10px; }
+    .form input{ width:100%; padding:12px 14px; border-radius:12px; border:1px solid #ddd; outline:none; font-size:15px; }
+    .row{ display:flex; gap:8px; align-items:center; }
+    .row > *{ flex:1; }
+    .btn{ padding:12px 14px; border:none; border-radius:12px; background:var(--brand); color:#fff; cursor:pointer; font-weight:600; }
+    .btn.alt{ background:#ffffff; color:#333; }
+    .subtle{ font-size:12px; opacity:.8; }
+
+    /* Screens (slide stages) */
+    .screens{ position:relative; flex:1; overflow:hidden; }
+    .screen{ position:absolute; inset:0; display:flex; flex-direction:column; transition:transform .35s ease; }
+    .screen--auth{ transform:translateX(0%); z-index:3; }
+    .screen--home{ transform:translateX(100%); z-index:2; }
+    .screen--chat{ transform:translateX(200%); z-index:1; }
+    .screens.active-auth .screen--auth{ transform:translateX(0%); }
+    .screens.active-auth .screen--home{ transform:translateX(100%); }
+    .screens.active-auth .screen--chat{ transform:translateX(200%); }
+    .screens.active-home .screen--auth{ transform:translateX(-100%); }
+    .screens.active-home .screen--home{ transform:translateX(0%); }
+    .screens.active-home .screen--chat{ transform:translateX(100%); }
+    .screens.active-chat .screen--auth{ transform:translateX(-200%); }
+    .screens.active-chat .screen--home{ transform:translateX(-100%); }
+    .screens.active-chat .screen--chat{ transform:translateX(0%); }
+
+    /* Home */
+    .panel{
+      background:var(--panel);
+      border:1px solid rgba(255,255,255,.25);
+      border-radius:var(--radius);
+      backdrop-filter:blur(12px);
+      box-shadow:var(--shadow);
+      margin:12px; padding:12px;
+      color:#fff;
+    }
+    .searchbar{ display:flex; gap:8px; align-items:center; }
+    .searchbar input{ flex:1; border:none; padding:12px 14px; border-radius:12px; background:#fff; color:#111; outline:none; font-size:15px; }
+    .searchbar button{ background:var(--brand); color:#fff; border:none; border-radius:12px; padding:10px 14px; }
+    .section-title{ margin:12px 6px 8px; font-weight:700; }
+    .list{ overflow:auto; max-height:calc(100vh - 260px); padding-bottom:90px; }
+    .item{
+      display:flex; align-items:center; gap:12px; padding:12px; cursor:pointer; color:#fff; text-decoration:none;
+      border-bottom:1px solid rgba(255,255,255,.12);
+    }
+    .item:last-child{ border-bottom:none; }
+    .avatar{ width:44px; height:44px; border-radius:50%; overflow:hidden; display:grid; place-items:center; background:#fff3; font-size:20px; }
+    .avatar img{ width:100%; height:100%; object-fit:cover; }
+    .meta{ flex:1; min-width:0; }
+    .name{ font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .sub{ font-size:12px; opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    /* Chat */
+    .chat-head{ display:flex; align-items:center; gap:10px; padding:10px 12px; color:#fff; border-bottom:1px solid rgba(255,255,255,.18); background:linear-gradient(0deg, rgba(255,255,255,.08), rgba(255,255,255,.18)); backdrop-filter:blur(10px); }
+    .chat-name{ font-weight:700; }
+    .chat-area{ flex:1; overflow:auto; padding:12px; display:flex; flex-direction:column; gap:6px; }
+    .msg{
+      max-width:80%; padding:9px 12px; font-size:15px; line-height:1.4; border-radius:16px;
+      background:var(--bubble-r); border:1px solid var(--bubble-r-b); color:#111; box-shadow:0 1px 1px rgba(0,0,0,.08);
+    }
+    .msg.sent{ align-self:flex-end; background:var(--bubble-s); border-color:var(--bubble-s-b); }
+    .msg .ts{ display:block; font-size:10px; color:#666; margin-top:4px; }
+    .msg img,.msg video,.msg audio{ max-width:240px; border-radius:12px; display:block; }
+    .composer{ display:flex; align-items:center; gap:8px; padding:8px; border-top:1px solid rgba(255,255,255,.18); background:linear-gradient(0deg, rgba(255,255,255,.08), rgba(255,255,255,.18)); backdrop-filter: blur(10px); }
+    .composer input{ flex:1; border:none; border-radius:20px; padding:12px 14px; background:#fff; outline:none; font-size:15px; }
+    .tool{ background:transparent; border:none; font-size:20px; color:var(--brand); }
+    .send{ background:var(--brand); color:#fff; border:none; border-radius:16px; padding:10px 14px; }
+
+    /* Bottom nav */
+    .nav{ position:sticky; bottom:0; left:0; right:0; background:#fff; border-top-left-radius:16px; border-top-right-radius:16px; box-shadow:0 -8px 24px rgba(0,0,0,.25); padding:8px; display:flex; gap:8px; justify-content:space-around; align-items:center; }
+    .nav button{ background:transparent; border:none; font-size:22px; transition:transform .12s ease; }
+    .nav button.active{ transform:scale(1.15); }
+
+    /* Profile sheet */
+    .sheet{ position:fixed; inset:auto 0 0 0; height:72%; transform:translateY(100%); transition:transform .3s ease; z-index:30; background:#fff; border-top-left-radius:18px; border-top-right-radius:18px; box-shadow:var(--shadow); display:flex; flex-direction:column; }
+    .sheet.open{ transform:translateY(0%); }
+    .sheet-header{ padding:12px 16px; display:flex; align-items:center; gap:8px; border-bottom:1px solid #eee; }
+    .sheet-title{ font-weight:800; }
+    .sheet-body{ padding:12px 16px; overflow:auto; }
+    .rowline{ display:flex; align-items:center; gap:10px; margin:10px 0; }
+    .rowline label{ min-width:110px; font-weight:700; }
+    .fonts{ display:flex; gap:8px; flex-wrap:wrap; }
+    .font-btn{ border:1px solid #ddd; padding:8px 10px; border-radius:10px; cursor:pointer; background:#fafafa; }
+    .swatches{ display:flex; gap:8px; flex-wrap:wrap; }
+    .swatch{ width:28px; height:28px; border-radius:8px; border:1px solid rgba(0,0,0,.1); cursor:pointer; }
+    .savebar{ padding:10px 16px; border-top:1px solid #eee; display:flex; gap:8px; justify-content:flex-end; }
+  </style>
+</head>
+<body>
+
+  <div class="app">
+    <!-- Top bar -->
+    <div class="app-header">
+      <div class="title">TEXTLY</div>
+      <span class="spacer"></span>
+      <button class="icon-btn" id="btnProfile">👤</button>
+      <button class="icon-btn" id="btnLogout" title="Logout" style="display:none">⎋</button>
+    </div>
+
+    <!-- Screens wrapper -->
+    <div class="screens active-auth" id="screens">
+      <!-- AUTH SCREEN -->
+      <section class="screen screen--auth" id="authScreen">
+        <div class="auth-wrap">
+          <div class="card">
+            <div class="tabs">
+              <button id="tabLogin" class="active">Login</button>
+              <button id="tabSignup">Sign Up</button>
+            </div>
+
+            <!-- LOGIN -->
+            <div id="loginPane">
+              <div class="form">
+                <input id="loginEmail" type="email" placeholder="Email" />
+                <input id="loginPass" type="password" placeholder="Password" />
+                <button class="btn" id="btnLogin">Login</button>
+                <button class="btn alt" id="btnGoogle">Continue with Google</button>
+                <button class="btn alt" id="btnAnon">Continue without account (dev)</button>
+                <div class="subtle">Forgot password? <span class="link" id="linkReset">reset</span></div>
+              </div>
+            </div>
+
+            <!-- SIGNUP -->
+            <div id="signupPane" style="display:none">
+              <div class="form">
+                <div class="row">
+                  <input id="signupEmail" type="email" placeholder="Email" />
+                  <input id="signupPass" type="password" placeholder="Password" />
+                </div>
+                <button class="btn" id="btnSignup">Create Account</button>
+                <div class="subtle">By continuing you agree to our very real terms 😄</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HOME SCREEN -->
+      <section class="screen screen--home" id="homeScreen">
+        <div class="panel">
+          <div class="searchbar">
+            <input id="userSearch" placeholder="Search users (by email)…" />
+            <button id="btnNewChat">New</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="section-title">Recent Chats</div>
+          <div class="list" id="chatList"></div>
+        </div>
+      </section>
+
+      <!-- CHAT SCREEN -->
+      <section class="screen screen--chat" id="chatScreen">
+        <div class="chat-head">
+          <button class="icon-btn" id="btnBack">←</button>
+          <div class="avatar" id="chatAvatar" style="width:36px;height:36px;"></div>
+          <div class="chat-name" id="chatName">Chat</div>
+          <span class="spacer"></span>
+        </div>
+
+        <div class="chat-area" id="chatArea"></div>
+
+        <div class="composer">
+          <button class="tool" id="btnEmoji" title="Emoji">😊</button>
+          <button class="tool" id="btnImage" title="Image">📷</button>
+          <button class="tool" id="btnVideo" title="Video">📹</button>
+          <button class="tool" id="btnDoc" title="Document">📄</button>
+          <button class="tool" id="btnAudio" title="Audio">🎵</button>
+          <input id="msgInput" placeholder="Type a message…" />
+          <button class="send" id="btnSend">Send</button>
+
+          <!-- Hidden inputs -->
+          <input type="file" id="imageInput" accept="image/*" style="display:none" />
+          <input type="file" id="videoInput" accept="video/*" style="display:none" />
+          <input type="file" id="docInput"   accept=".pdf,.doc,.docx" style="display:none" />
+          <input type="file" id="audioInput" accept="audio/*" style="display:none" />
+        </div>
+      </section>
+    </div>
+
+    <!-- Bottom nav -->
+    <nav class="nav" id="bottomNav" style="display:none">
+      <button title="Home" id="navHome">🏠</button>
+      <button title="Search" id="navSearch">🔎</button>
+      <button title="Settings" id="navSettings">⚙️</button>
+      <button title="Profile" id="navProfile">👤</button>
+    </nav>
+  </div>
+
+  <!-- PROFILE SHEET -->
+  <div class="sheet" id="sheet">
+    <div class="sheet-header">
+      <div class="sheet-title">Your Profile</div>
+      <span class="spacer"></span>
+      <button class="icon-btn" id="sheetClose">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="rowline">
+        <label>Avatar</label>
+        <div class="avatar" id="meAvatar" style="width:60px;height:60px;"></div>
+        <button class="icon-btn" id="pickAvatar">Upload</button>
+        <input type="file" id="avatarInput" accept="image/*" style="display:none" />
+      </div>
+
+      <div class="rowline">
+        <label>Theme</label>
+        <div class="swatches" id="swatches"></div>
+        <input type="color" id="customColor" value="#5563DE" title="Primary color" />
+      </div>
+
+      <div class="rowline">
+        <label>Font</label>
+        <div class="fonts" id="fontChoices">
+          <button class="font-btn" data-font="system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, sans-serif">Default</button>
+          <button class="font-btn" data-font="'Inter', system-ui, -apple-system, Segoe UI, Roboto">Inter</button>
+          <button class="font-btn" data-font="'Poppins', system-ui, -apple-system, Segoe UI, Roboto">Poppins</button>
+          <button class="font-btn" data-font="'Nunito', system-ui, -apple-system, Segoe UI, Roboto">Nunito</button>
+          <button class="font-btn" data-font="'Merriweather', Georgia, serif">Merriweather</button>
+        </div>
+      </div>
+    </div>
+    <div class="savebar">
+      <button class="icon-btn" id="resetPrefs">Reset</button>
+      <button class="icon-btn" id="savePrefs">Save</button>
+    </div>
+  </div>
+
+  <!-- Firebase App -->
+  <script type="module">
+    import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js";
+    import {
+      getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+      GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, signOut, signInAnonymously
+    } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js";
+    import {
+      getFirestore, collection, doc, getDoc, setDoc, addDoc, query, where, onSnapshot, orderBy,
+      getDocs, updateDoc
+    } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
+
+    // ===== Firebase Config (replace with yours if needed) =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyAfsrEvRLqyqaPD9ypBx314u71i2J1SsHE",
+      authDomain: "textly-c9cbb.firebaseapp.com",
+      projectId: "textly-c9cbb",
+      storageBucket: "textly-c9cbb.firebasestorage.app",
+      messagingSenderId: "130520832234",
+      appId: "1:130520832234:web:10fd9319e46111cb39df93",
+      measurementId: "G-172YKCM75W"
+    };
+    if(!getApps().length) initializeApp(firebaseConfig);
+
+    const auth = getAuth();
+    const db   = getFirestore();
+
+    // ===== DOM helpers =====
+    const $  = id => document.getElementById(id);
+    const screens = $("screens");
+    const chatList   = $("chatList");
+    const chatArea   = $("chatArea");
+    const chatName   = $("chatName");
+    const chatAvatar = $("chatAvatar");
+    const bottomNav  = $("bottomNav");
+    const btnLogout  = $("btnLogout");
+
+    // Active nav styler
+    function setActiveNav(id){
+      document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));
+      const btn = document.getElementById(id);
+      if (btn) btn.classList.add("active");
+    }
+
+    function setStage(stage){ // "auth" | "home" | "chat"
+      screens.className = `screens active-${stage}`;
+      bottomNav.style.display = (stage === "home" || stage === "chat") ? "flex" : "none";
+      btnLogout.style.display  = (stage === "home" || stage === "chat") ? "inline-block" : "none";
+      if(stage==="home") setActiveNav("navHome");
+      if(stage==="chat") setActiveNav(""); // none active
+    }
+    function ts(t){ return new Date(t).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+    function escapeHtml(s){ return (s||"").replace(/[&<>"]/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c])); }
+    function getRandomEmoji(){
+      const list = ["😀","😎","🦄","🐱","🐶","🐼","🐯","🦊","🐵","🐸","🐤","🐧","🐨","🦁","🐰","🐻","🐨","🐹"];
+      return list[Math.floor(Math.random()*list.length)];
+    }
+    const myEmail = ()=> auth.currentUser?.email ?? `anon:${auth.currentUser?.uid||"nouid"}@textly.local`;
+
+    function showAuthError(where, err) {
+      console.error(`[${where}]`, err);
+      const code = err?.code || "unknown";
+      const msg =
+        code === "auth/invalid-credential" ? "Email or password is incorrect."
+      : code === "auth/invalid-email" ? "That email looks invalid."
+      : code === "auth/user-not-found" ? "No user with that email. Try Sign Up first."
+      : code === "auth/wrong-password" ? "Wrong password."
+      : code === "auth/popup-blocked" ? "Popup blocked. Allow popups or try again."
+      : code === "auth/popup-closed-by-user" ? "Popup closed. Try again."
+      : code === "auth/network-request-failed" ? "Network error. Check your internet."
+      : code === "auth/operation-not-allowed" ? "Provider not enabled in Firebase Console."
+      : `${code.replace("auth/","")}`;
+      alert(`Login error: ${msg}`);
+    }
+
+    // ===== Global state =====
+    let currentConvoId = null;
+    let unsubConvos = null;
+    let unsubMsgs   = null;
+
+    // ===== Auth UI logic =====
+    $("tabLogin").addEventListener("click", ()=>{
+      $("tabLogin").classList.add("active");
+      $("tabSignup").classList.remove("active");
+      $("loginPane").style.display="block";
+      $("signupPane").style.display="none";
+    });
+    $("tabSignup").addEventListener("click", ()=>{
+      $("tabSignup").classList.add("active");
+      $("tabLogin").classList.remove("active");
+      $("signupPane").style.display="block";
+      $("loginPane").style.display="none";
+    });
+
+    $("btnLogin").addEventListener("click", async ()=>{
+      const email = $("loginEmail").value.trim();
+      const pass  = $("loginPass").value.trim();
+      if(!email || !pass) return alert("Enter email and password");
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+      } catch (e) { showAuthError("email-login", e); }
+    });
+
+    $("btnGoogle").addEventListener("click", async ()=>{
+      try {
+        const provider = new GoogleAuthProvider();
+        await signInWithPopup(auth, provider);
+      } catch (e) { showAuthError("google-login", e); }
+    });
+
+    $("btnAnon").addEventListener("click", async ()=>{
+      try { await signInAnonymously(auth); alert("Signed in anonymously (dev). Some features may be limited."); }
+      catch (e) { showAuthError("anon-login", e); }
+    });
+
+    $("linkReset").addEventListener("click", async ()=>{
+      const email = prompt("Enter your email to reset password:"); if(!email) return;
+      try{ await sendPasswordResetEmail(auth, email); alert("Reset email sent."); }catch(e){ showAuthError("reset", e); }
+    });
+
+    $("btnSignup").addEventListener("click", async ()=>{
+      const email = $("signupEmail").value.trim();
+      const pass  = $("signupPass").value.trim();
+      if(!email || !pass) return alert("Enter email and password");
+      try{
+        const { user } = await createUserWithEmailAndPassword(auth, email, pass);
+        await setDoc(doc(db, "users", user.uid), { email: user.email, emoji: getRandomEmoji(), avatar: null });
+        alert("Account created! You are now logged in.");
+      }catch(e){ showAuthError("email-signup", e); }
+    });
+
+    $("btnLogout").addEventListener("click", async ()=>{
+      try{ await signOut(auth); }catch(e){ alert(e.message); }
+    });
+
+    onAuthStateChanged(auth, async (user)=>{
+      if(user){
+        await ensureUserDoc(user);
+        hydrateHome();
+        setStage("home");
+      }else{
+        setStage("auth");
+      }
+    });
+
+    async function ensureUserDoc(user){
+      const uref = doc(db,"users", user.uid);
+      const snap = await getDoc(uref);
+      if(!snap.exists()){
+        await setDoc(uref, { email: user.email ?? `anon:${user.uid}@textly.local`, emoji: getRandomEmoji(), avatar: null });
+      }
+      const data = (await getDoc(uref)).data();
+      $("meAvatar").innerHTML = data?.avatar ? `<img src="${data.avatar}">` :
+        (data?.emoji ? `<div style="font-size:26px">${data.emoji}</div>` : "👤");
+    }
+
+    // ===== Home screen =====
+    function hydrateHome(){
+      // live convo list
+      if(unsubConvos) unsubConvos();
+      const qConvos = query(collection(db,"conversations"), where("participants","array-contains", myEmail()));
+      unsubConvos = onSnapshot(qConvos, async (snap)=>{
+        chatList.innerHTML = "";
+        const rows = [];
+        snap.forEach(d => rows.push({ id:d.id, ...d.data() }));
+        for(const c of rows){
+          let other = c.isGroup ? (c.title || "Group") : (c.participants.find(p=>p!==myEmail()) || myEmail());
+          let avatar = "https://via.placeholder.com/80?text=%F0%9F%98%80";
+          if(!c.isGroup && other.includes("@")){
+            const qU = query(collection(db,"users"), where("email","==", other));
+            const sU = await getDocs(qU);
+            if(!sU.empty){
+              const u = sU.docs[0].data();
+              avatar = u.avatar || `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><text x='50%' y='52%' dominant-baseline='middle' text-anchor='middle' font-size='42'>${u.emoji||"👤"}</text></svg>`;
+              other = other.split("@")[0];
+            }
+          }
+          const row = document.createElement("div");
+          row.className="item";
+          row.innerHTML = `
+            <div class="avatar"><img src="${avatar}"></div>
+            <div class="meta">
+              <div class="name">${escapeHtml(other)}</div>
+              <div class="sub">${c.isGroup ? (c.title||"Group chat") : (c.participants.find(p=>p!==myEmail()) || myEmail())}</div>
+            </div>`;
+          row.addEventListener("click", ()=> openChat(c.id, other, avatar));
+          chatList.appendChild(row);
+        }
+      });
+    }
+
+    // New chat from search
+    $("btnNewChat").addEventListener("click", async ()=>{
+      const email = $("userSearch").value.trim().toLowerCase() || prompt("Enter email to chat with:")?.trim().toLowerCase();
+      if(!email) return;
+      if(email===myEmail().toLowerCase()) return alert("You cannot chat with yourself.");
+      // validate
+      const qU = query(collection(db,"users"), where("email","==", email));
+      const sU = await getDocs(qU);
+      if(sU.empty){ return alert("User not found."); }
+      // find/create
+      const qC = query(collection(db,"conversations"), where("isGroup","==", false));
+      const sC = await getDocs(qC);
+      let id = null;
+      sC.forEach(d=>{
+        const c=d.data();
+        if(c.participants.length===2 && c.participants.includes(myEmail()) && c.participants.includes(email)) id=d.id;
+      });
+      if(!id){
+        const ref = await addDoc(collection(db,"conversations"), { isGroup:false, participants:[myEmail(), email], createdAt: Date.now() });
+        id = ref.id;
+      }
+      openChat(id, email.split("@")[0], "https://via.placeholder.com/80?text=%F0%9F%98%80");
+    });
+
+    // ===== Chat screen =====
+    $("btnBack").addEventListener("click", ()=>{
+      if(unsubMsgs) unsubMsgs();
+      setStage("home");
+      currentConvoId = null;
+      chatArea.innerHTML = "";
+    });
+
+    async function openChat(id, name, avatar){
+      currentConvoId = id;
+      chatName.textContent = name;
+      chatAvatar.innerHTML = `<img src="${avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+      setStage("chat");
+
+      if(unsubMsgs) unsubMsgs();
+      const qMsgs = query(collection(db,"conversations", id, "messages"), orderBy("timestamp","asc"));
+      unsubMsgs = onSnapshot(qMsgs, snap=>{
+        chatArea.innerHTML="";
+        snap.forEach(m=>{
+          const msg = m.data();
+          const side = (msg.sender===myEmail()) ? "sent" : "";
+          const div = document.createElement("div");
+          div.className = `msg ${side}`;
+          if(msg.type==="text"){
+            div.innerHTML = `${escapeHtml(msg.content)}<span class="ts">${ts(msg.timestamp)}</span>`;
+          }else if(msg.type==="image"){
+            div.innerHTML = `<img src="${msg.content}" /><span class="ts">${ts(msg.timestamp)}</span>`;
+          }else if(msg.type==="video"){
+            div.innerHTML = `<video src="${msg.content}" controls></video><span class="ts">${ts(msg.timestamp)}</span>`;
+          }else if(msg.type==="document"){
+            div.innerHTML = `<a href="${msg.content}" target="_blank">Open document</a><span class="ts">${ts(msg.timestamp)}</span>`;
+          }else if(msg.type==="audio"){
+            div.innerHTML = `<audio src="${msg.content}" controls></audio><span class="ts">${ts(msg.timestamp)}</span>`;
+          }
+          chatArea.appendChild(div);
+        });
+        chatArea.scrollTop = chatArea.scrollHeight;
+      });
+    }
+
+    // Send text
+    $("btnSend").addEventListener("click", async ()=>{
+      const text = $("msgInput").value.trim();
+      if(!text || !currentConvoId) return;
+      const message = { sender: myEmail(), type:"text", content:text, timestamp: Date.now() };
+      await addDoc(collection(db,"conversations", currentConvoId, "messages"), message);
+      $("msgInput").value = "";
+    });
+    $("msgInput").addEventListener("keyup", e=>{ if(e.key==="Enter") $("btnSend").click(); });
+
+    // Media helpers
+    $("btnImage").addEventListener("click", ()=> $("imageInput").click());
+    $("btnVideo").addEventListener("click", ()=> $("videoInput").click());
+    $("btnDoc").addEventListener("click",   ()=> $("docInput").click());
+    $("btnAudio").addEventListener("click", ()=> $("audioInput").click());
+
+    function pickAndSend(fileInput, type){
+      const file = fileInput.files?.[0];
+      if(!file || !currentConvoId) return;
+      const reader = new FileReader();
+      reader.onload = async (ev)=>{
+        const message = { sender: myEmail(), type, content: ev.target.result, timestamp: Date.now() };
+        await addDoc(collection(db,"conversations", currentConvoId, "messages"), message);
+      };
+      reader.readAsDataURL(file);
+      fileInput.value="";
+    }
+    $("imageInput").addEventListener("change", e=> pickAndSend(e.target,"image"));
+    $("videoInput").addEventListener("change", e=> pickAndSend(e.target,"video"));
+    $("docInput").addEventListener("change",   e=> pickAndSend(e.target,"document"));
+    $("audioInput").addEventListener("change", e=> pickAndSend(e.target,"audio"));
+
+    // Emoji
+    const picker = new EmojiButton({ position:"top-start", theme:"auto" });
+    $("btnEmoji").addEventListener("click", ()=> picker.togglePicker($("btnEmoji")));
+    picker.on("emoji", (emoji)=> { $("msgInput").value += emoji; $("msgInput").focus(); });
+
+    // ===== Profile sheet (avatar + font + color theme) =====
+    const sheet = $("sheet");
+    const openSheet  = ()=> sheet.classList.add("open");
+    const closeSheet = ()=> sheet.classList.remove("open");
+    $("btnProfile").addEventListener("click", openSheet);
+    $("sheetClose").addEventListener("click", closeSheet);
+
+    // Avatar upload (stored in Firestore users doc)
+    $("pickAvatar").addEventListener("click", ()=> $("avatarInput").click());
+    $("avatarInput").addEventListener("change", async (e)=>{
+      const file = e.target.files?.[0]; if(!file) return;
+      const reader=new FileReader();
+      reader.onload = async (ev)=>{
+        $("meAvatar").innerHTML = `<img src="${ev.target.result}">`;
+        if(auth.currentUser) await updateDoc(doc(db,"users", auth.currentUser.uid), { avatar: ev.target.result });
+        alert("Avatar updated!");
+      };
+      reader.readAsDataURL(file);
+      e.target.value="";
+    });
+
+    // Theme presets
+    const palettes = [
+      { a:"#5563DE", b:"#8752D9" }, // default
+      { a:"#00c6ff", b:"#0072ff" },
+      { a:"#ff7e5f", b:"#feb47b" },
+      { a:"#11998e", b:"#38ef7d" },
+      { a:"#fc466b", b:"#3f5efb" },
+      { a:"#f7971e", b:"#ffd200" },
+    ];
+    const sw = $("swatches");
+    palettes.forEach(p=>{
+      const s=document.createElement("div");
+      s.className="swatch"; s.style.background=`linear-gradient(120deg, ${p.a}, ${p.b})`;
+      s.addEventListener("click", ()=> applyTheme(p.a, p.b));
+      sw.appendChild(s);
+    });
+    $("customColor").addEventListener("input", (e)=> applyTheme(e.target.value, "#111111"));
+    function applyTheme(a,b){
+      document.documentElement.style.setProperty("--bg-1", a);
+      document.documentElement.style.setProperty("--bg-2", b);
+    }
+
+    // Fonts
+    $("fontChoices").addEventListener("click", (e)=>{
+      const btn = e.target.closest(".font-btn"); if(!btn) return;
+      const font = btn.getAttribute("data-font");
+      if(font) document.documentElement.style.setProperty("--font", font);
+    });
+
+    // Save & reset prefs (localStorage)
+    $("savePrefs").addEventListener("click", ()=>{
+      const s = getComputedStyle(document.documentElement);
+      const prefs = {
+        a: s.getPropertyValue("--bg-1").trim(),
+        b: s.getPropertyValue("--bg-2").trim(),
+        font: s.getPropertyValue("--font").trim()
+      };
+      localStorage.setItem("textly:prefs", JSON.stringify(prefs));
+      alert("Preferences saved");
+      closeSheet();
+    });
+    $("resetPrefs").addEventListener("click", ()=>{
+      applyTheme("#5563DE","#8752D9");
+      document.documentElement.style.setProperty("--font", "system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, sans-serif");
+    });
+
+    // Load saved prefs on boot
+    (function(){
+      const s = localStorage.getItem("textly:prefs");
+      if(!s) return;
+      try{
+        const {a,b,font} = JSON.parse(s);
+        if(a&&b) applyTheme(a,b);
+        if(font) document.documentElement.style.setProperty("--font", font);
+      }catch{}
+    })();
+
+    // ===== Bottom nav actions =====
+    $("navHome").addEventListener("click", ()=>{
+      setStage("home");
+      setActiveNav("navHome");
+    });
+    $("navSearch").addEventListener("click", ()=>{
+      setStage("home");
+      setActiveNav("navSearch");
+      const input = $("userSearch");
+      if (input) {
+        input.scrollIntoView({behavior:"smooth", block:"center"});
+        input.focus();
+      }
+    });
+    const openProfileFromNav = ()=>{ openSheet(); };
+    $("navSettings").addEventListener("click", ()=>{
+      openProfileFromNav();
+      setActiveNav("navSettings");
+    });
+    $("navProfile").addEventListener("click", ()=>{
+      openProfileFromNav();
+      setActiveNav("navProfile");
+    });
+
+  </script>
+</body>
+</html>
